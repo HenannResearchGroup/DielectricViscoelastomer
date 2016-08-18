@@ -1,0 +1,335 @@
+*Heading
+3D Viscoelastic dielectric UEL test
+**
+** This input file is for the simulation of 3D multielement 
+**    electromechanical actuation. To be used use UEL subroutine, 
+**    uel_ViscoDielectric_Public.for
+**
+** UNITS:  Length - meters, Time - sec, Angle - radians,
+**	   Force - Newtons, Stress - Newton/meter^2 = Pa, 
+**	   Mass - kilograms, Density - kg/meter^3, Energy - Joules
+**
+** The electrical units are chosen so that the permittivity is unity.
+**
+** To interpret the simulated electric potential in volts for a real material:
+**
+**       real potential = simulated potential/sqrt(real permittivity)
+**
+** To interpret the simulated charge in coulombs for a real material:
+** 
+**       real charge = simulated charge*sqrt(real permittivity)
+**
+** REDUCED INTEGRATION: In order to use reduced integration three 
+**     changes should be made:
+**
+**     1. The element type of the dummy mesh should be changed
+**        from CPE4 to CPE4R.
+**     2. In the Material Definition section of this input file,
+**        the '*Hourglass Stiffness' command and subsequent line
+**        should be uncommented.
+**     3. In the UEL subroutine, nInt should be set to 1.
+**
+** Shuolun Wang, August 2014
+**
+************************************************************************
+**			PARAMETERS
+************************************************************************
+*Parameter
+**
+** size of cube (m)
+b = 1.0e-3
+**
+** Shear modulus (Pa)
+Gshr = 15.36e3
+**
+** locking stretch (set less than zero for neoHookean)
+lamL = 5.99
+**
+** Bulk modulus (Pa)
+Kblk = 1000.0*Gshr
+**
+** Number of nonequilibrium viscous mechanisms
+nVisco = 3
+**
+** Number of local SDVs
+nlSdv = 6*nVisco
+**
+** Nonequilibrium shear modulli, you need nVisco of them (Pa)
+G1 = 26.53e3
+G2 = 10.83e3
+G3 = 26.06e3
+**
+** Maxwell element relaxation time, you need nVisco of them (sec)
+tau1 = 6.56
+tau2 = 61.25
+tau3 = 0.6074
+**
+** total props and jprops
+nProps = 4 + nVisco*2
+nJProps = 3
+**
+** number of volume integration points
+nInt = 8
+**
+** total of local SDV's per element (nlSdv*nInt)
+nVars = nlSdv*nInt
+**
+** Permittivity (arbitrary units)
+permit = 1.0
+**
+** Final normalized potential
+phi_norm = 0.8
+**
+** rate to apply normalized potential (per second)
+rate = 1.e-2
+**
+** total simulation time (seconds)
+tf = phi_norm/rate
+**
+** initial potential
+phi0 = 0.0
+**
+** number of elements in the x, y, and z directions
+ex = 4
+ey = 4
+ez = 4
+**
+************************************************************************
+** calculations for geometry, node numbering, loads, etc., don't change
+**
+n1 = 1
+n2 = n1 + ex
+n3 = ey*100 + 1
+n4 = n3 + ex
+n5 = 1 + ez*10000
+n6 = n5 + ex
+n7 = ey*100 + 1 + ez*10000
+n8 = n7 + ex
+e1 = 1
+e2 = ex
+e3 = n3 - 100
+e4 = e3 + ex - 1
+e5 = 10001
+e6 = 10000 + ex
+e7 = n7 - 100
+e8 = e7 + ex - 1
+**
+** Final potential
+phi = phi_norm*b*sqrt(Gshr/permit)
+**
+** Hourglass stiffness (Pa)
+Ghour = 0.005*Gshr
+**
+** Interval time (s)
+tint = tf/20.0
+**
+************************************************************************
+**			MODEL DEFINITION
+************************************************************************
+*Node
+<n1>,  0.0,   0.0,   0.0
+<n2>,  <b>,   0.0,   0.0
+<n3>,  0.0,   <b>,   0.0
+<n4>,  <b>,   <b>,   0.0
+<n5>,  0.0,   0.0,   <b>
+<n6>,  <b>,   0.0,   <b>
+<n7>,  0.0,   <b>,   <b>
+<n8>,  <b>,   <b>,   <b>
+**
+** Nodes
+**
+*Nset, nset=n1
+<n1>
+*Nset, nset=n2
+<n2>
+*Nset, nset=n3
+<n3>
+*Nset, nset=n4
+<n4>
+*Nset, nset=n5
+<n5>
+*Nset, nset=n6
+<n6>
+*Nset, nset=n7
+<n7>
+*Nset, nset=n8
+<n8>
+*Nfill, nset=botleft
+n1, n3, <ey>, 100
+*Nfill, nset=botright
+n2, n4, <ey>, 100
+*Nfill, nset=NBottom
+botleft, botright, <ex>,1
+*Nfill, nset=topleft
+n5, n7, <ey>, 100
+*Nfill, nset=topright
+n6, n8, <ey>, 100
+*Nfill, nset=NTop
+topleft, topright, <ex>,1
+*Nfill, nset=Nall
+NBottom, NTop, <ez>, 10000
+*Nset, nset=botbot, gen
+<n1>, <n2>, 1
+**
+** Elements
+**
+*User Element,Nodes=8,Type=U3,Iproperties=<nJProps>,Properties=<nProps>,Coordinates=3,Variables=<nVars>,Unsymm
+1,2,3,11
+**
+*Element, type=U3
+1, 1,2,102,101,10001,10002,10102,10101
+*Elgen, elset=Elall
+1,<ex>,1,1,<ey>,100,100,<ez>,10000,10000
+**
+** Make the dummy mesh, shares nodes with the real mesh,
+**  allows visualization of the results, access to 
+**  hourglass controls, and access to mechanical, 
+**  traction-type boundary conditions
+**
+*Element, type=C3D8
+1000000, 1,2,102,101,10001,10002,10102,10101
+*Elgen, elset=ElDummy
+1000000,<ex>,1,1,<ey>,100,100,<ez>,10000,10000
+**
+**
+** Make a dummy element which is not connected to anything with C3D8T
+**  just so that we can have the coupled thermal-displacement
+**
+*Node
+999999992,  0.0, 0.0, 0.0
+999999993,  .00001, 0.0, 0.0
+999999994,  .00001, .00001, 0.0
+999999995,  0.0, .00001, 0.0
+999999996,  0.0, 0.0, 0.00001
+999999997,  .00001, 0.0, 0.00001
+999999998,  .00001, .00001, 0.00001
+999999999,  0.0, .00001, 0.00001
+*Nset, nset=tempElement
+999999992,999999993,999999994,999999995,999999996,999999997,999999998,999999999
+*Element, Type=C3D8T
+999999998,999999992,999999993,999999994,999999995,999999996,999999997,999999998,999999999
+*Elset,elset=tempElement
+999999998
+************************************************************************
+**			MATERIAL DEFINITION
+************************************************************************
+**
+** Material properties for the real material
+**
+*uel property,elset=elall
+*******************************************************************
+**Gshr	lamL	Kblk	permit		Gneq	tau	Gneq	tau
+<Gshr>,	<lamL>,	<Kblk>,	<permit>,	<G1>,	<tau1>,	<G2>,	<tau2>,
+**
+**Gneq	tau	nVisco		nlSdv		nInt
+<G3>,	<tau3>,	<nVisco>,	<nlSdv>,	<nInt>
+**
+*******************************************************************
+**
+** Dummy mesh material properties
+**
+*Solid section, elset=ElDummy, material=Material-1
+*Solid section, elset=tempElement, material=Material-2
+***Hourglass stiffness
+**<Ghour>
+**
+*Material, name=Material-1
+*Elastic
+1.e-20
+*Density
+1.0
+*User output variables
+1
+**
+*Material, name=Material-2
+*Elastic
+1.e-20
+*Conductivity
+1.0
+*Density
+1.0
+*Specific heat
+1.0
+**
+************************************************************************
+**			INITIAL CONDITIONS
+************************************************************************
+*Initial conditions, type=temperature
+nall, <phi0>
+tempElement, <phi0>
+************************************************************************
+**			   AMPLITUDE
+************************************************************************
+*Amplitude, name=Amp-1
+0.0,0.0,<tf>,1.0
+*Amplitude, name=Amp-2
+0.0,1.0,<tf>,0.0
+************************************************************************
+**			STEP DEFINITION
+************************************************************************
+*Step, Name=Load, nlgeom=yes, inc=50000
+*Coupled temperature-displacement, deltmx=100.0
+<tint>,<tf>,1.e-12,<tint>
+*CONTROLS, PARAMETERS=LINE SEARCH
+10,1.0,0.0001,0.25,0.10
+*CONTROLS, PARAMETERS=TIME INCREMENTATION
+,,,,,,,10,,,,,,
+**
+*Boundary
+NBottom,3,3
+BotLeft,1,1
+BotBot,2,2
+NBottom,11,11,<phi0>
+*Boundary, amplitude=Amp-1
+NTop,11,11,<phi>
+*Boundary
+tempElement,encastre
+tempElement,11,11,<phi0>
+**
+*Output, field, time interval=<tint>
+*node output, nset=nall
+u,nt
+*node output, nset=tempElement
+u
+*Element output, elset=ElDummy
+le
+**
+*Output, history, frequency=1
+*node output, nset=n8
+u1,u2,u3,rf1,rf2,rf3,nt11,rfl11
+**
+*End Step
+************************************************************************
+*Step, Name=Unload, nlgeom=yes, inc=50000
+*Coupled temperature-displacement, deltmx=100.0
+<tint>,<tf>,1.e-12,<tint>
+*CONTROLS, PARAMETERS=LINE SEARCH
+10,1.0,0.0001,0.25,0.10
+*CONTROLS, PARAMETERS=TIME INCREMENTATION
+,,,,,,,10,,,,,,
+**
+*Boundary
+NBottom,3,3
+BotLeft,1,1
+BotBot,2,2
+NBottom,11,11,<phi0>
+*Boundary, amplitude=Amp-2
+NTop,11,11,<phi>
+*Boundary
+tempElement,encastre
+tempElement,11,11,<phi0>
+**
+*Output, field, time interval=<tint>
+*node output, nset=nall
+u,nt
+*node output, nset=tempElement
+u
+*Element output, elset=ElDummy
+le
+**
+*Output, history, frequency=1
+*node output, nset=n8
+u1,u2,u3,rf1,rf2,rf3,nt11,rfl11
+**
+*End Step
+************************************************************************

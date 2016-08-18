@@ -1,0 +1,394 @@
+*Heading
+Viscoelastic dielectric plane-strain crease
+**
+** This input file is for the simulation of a 2D multielement 
+**    plane-strain or axisymmetric electromechanical actuation.  
+**    To be used with uel_ViscoDielectric_Public.for
+**
+** UNITS:  Length - meters, Time - sec, Angle - radians,
+**	   Force - Newtons, Stress - Newton/meter^2 = Pa, 
+**	   Mass - kilograms, Density - kg/meter^3, Energy - Joules
+**
+** The electrical units are chosen so that the permittivity is unity.
+**
+** To interpret the simulated electric potential in volts for a real material:
+**
+**       real potential = simulated potential/sqrt(real permittivity)
+**
+** To interpret the simulated charge in coulombs for a real material:
+** 
+**       real charge = simulated charge*sqrt(real permittivity)
+**
+** REDUCED INTEGRATION: In order to use reduced integration three 
+**     changes should be made:
+**
+**     1. The element type of the dummy mesh should be changed
+**        from CPE4 to CPE4R.
+**     2. In the Material Definition section of this input file,
+**        the '*Hourglass Stiffness' command and subsequent line
+**        should be uncommented.
+**     3. In the UEL subroutine, nInt should be set to 1.
+**
+** Shuolun Wang, August 2014
+**
+************************************************************************
+**			PARAMETERS
+************************************************************************
+*Parameter
+**
+** size of the body (m)
+W0 = 20.e-3
+L0 = 6*W0
+L1 = 1.1*L0
+**
+** size of the imperfection (m)
+imper = 1e-3*L0
+**
+** Is step 2 an unload, or a hold step -- choose one
+*** Step2 = 'HoldAmp'
+Step2 = 'UnloadAmp'
+**
+** Shear modulus (Pa)
+Gshr = 15.36e3
+**
+** locking stretch (set less than zero for neoHookean)
+lamL = 5.99
+**
+** Bulk modulus (Pa)
+Kblk = 1e3*Gshr
+**
+** Number of nonequilibrium viscous mechanisms
+nVisco = 3
+**
+** Number of local SDVs
+nlSdv = 6*nVisco
+**
+** Nonequilibrium shear modulli, you need nVisco of them (Pa)
+G1 = 26.53e3
+G2 = 10.83e3
+G3 = 26.06e3
+**
+** Maxwell element relaxation time, you need nVisco of them (sec)
+tau1 = 6.56
+tau2 = 61.25
+tau3 = 0.6074
+**
+** total props and jprops
+nProps = 4 + nVisco*2
+nJProps = 3
+**
+** number of volume integration points
+nInt = 4
+**
+** total of local SDV's per element (nlSdv*nInt)
+nVars = nlSdv*nInt
+**
+** Permittivity (arbitrary units)
+permit = 1.0
+**
+** Final normalized potential
+phi_norm = 1.5
+**
+** Final potential
+phi = phi_norm*L0*sqrt(Gshr/permit)
+**
+** rate to apply normalized potential (per second)
+rate = 1.e-6
+**
+** total simulation time (seconds)
+tf = phi_norm/rate
+**
+** initial potential
+phi0 = 0.0
+**
+** number of elements in the x and y directions
+ex = 50
+ey = 75
+**
+** Hourglass stiffness (Pa)
+Ghour = 0.005*Gshr
+**
+** Interval time (s)
+tint = tf/20.0
+**
+************************************************************************
+** calculations for geometry, node numbering, loads, etc., don't change
+**
+nlayer = ex + 1
+**
+n1 = 1
+n2 = n1 + ex
+n3 = ey*nlayer + 1
+n4 = n3 + ex
+**
+e1 = 1
+e2 = e1 - 1 + ex
+e3 = 1 + (ey - 1)*ex + (e1 - 1)
+e4 = e3 + ex - 1
+**
+elmas1 = n1
+elmas2 = n1 + 1
+elmas3 = n1 + 1 + nlayer
+elmas4 = n1 + nlayer
+**
+e1dum = ex*ey + 1
+e2dum = e1dum - 1 + ex
+e3dum = 1 + (ey - 1)*ex + (e1dum - 1)
+e4dum = e3dum + ex - 1
+**
+************************************************************************
+**			MODEL DEFINITION
+************************************************************************
+*Node
+<n1>,  0.0,   0.0
+<n2>,  <W0>,  0.0
+<n3>,  0.0,   <L0>
+<n4>,  <W0>,  <L0>
+**
+** Nodes
+**
+*Nset, nset=n1
+<n1>
+*Nset, nset=n2
+<n2>
+*Nset, nset=n3
+<n3>
+*Nset, nset=n4
+<n4>
+*Nfill, nset=left, bias=1.05
+n1, n3, <ey>, <nlayer>
+*Nfill, nset=right, bias=1.05
+n2, n4, <ey>, <nlayer>
+*Nfill, nset=Nall, bias=0.95
+left, right, <ex>,1
+*Nset, nset=top, gen
+<n3>, <n4>, 1
+*Nset, nset=bottom, gen
+<n1>, <n2>, 1
+**
+**
+*Imperfection
+<n3>,0.0,-<imper>
+**
+**
+** Elements
+**
+*User Element,Nodes=4,Type=U1,Iproperties=<nJProps>,Properties=<nProps>,Coordinates=2,Variables=<nVars>,Unsymm
+1,2,11
+**
+*Element, type=U1
+<e1>, <elmas1>,<elmas2>,<elmas3>,<elmas4>
+*Elgen, elset=Elall
+<e1>,<ex>,1,1,<ey>,<nlayer>,<ex>
+*Elset, elset=eltop, gen
+<e3>, <e4>, 1
+*Elset, elset=elbot, gen
+<e1>, <e2>, 1
+*Elset, elset=elright, gen
+<e2>, <e4>, <ex>
+*Elset, elset=elleft, gen
+<e1>, <e3>, <ex>
+**
+** Make the dummy mesh, shares nodes with the real mesh,
+**  allows visualization of the results, access to 
+**  hourglass controls, and access to mechanical, 
+**  traction-type boundary conditions
+**
+*Element, type=CPE4
+<e1dum>, <elmas1>,<elmas2>,<elmas3>,<elmas4>
+*Elgen, elset=ElDummy
+<e1dum>,<ex>,1,1,<ey>,<nlayer>,<ex>
+*Elset, elset=eltopdum, gen
+<e3dum>, <e4dum>, 1
+*Elset, elset=elbotdum, gen
+<e1dum>, <e2dum>, 1
+*Elset, elset=elrightdum, gen
+<e2dum>, <e4dum>, <ex>
+*Elset, elset=elleftdum, gen
+<e1dum>, <e3dum>, <ex>
+**
+**
+** Make a surface to model self contact with the rigid wall
+**
+**
+*Surface, Type=Node, Name=TopSurf
+Top
+*Surface, Type=Element, Name=TopSurfElem
+elTopDum, S3
+**
+**
+** Make a rigid surface for modeling self contact
+**
+**
+*Node
+999995,0.0,0.0
+*Nset, Nset=RigidRef
+999995
+*Surface, type=SEGMENTS, name=RigidSurf
+START, 0.0,<L1>
+LINE,  0.0,0.0
+*Rigid Body, ref node=RigidRef, analytical surface=RigidSurf
+**
+**
+** Make a dummy element which is not connected to anything with CPE4T
+**  just so that we can have the coupled thermal-displacement
+**
+*Node
+999996,  0.0, 0.0
+999997,  .00001, 0.0
+999998,  .00001, .00001
+999999,  0.0, .00001
+*Nset, nset=tempElement
+999996,999997,999998,999999
+*Element, Type=CPE4T
+999999,999996,999997,999998,999999
+*Elset,elset=tempElement
+999999
+************************************************************************
+**			MATERIAL DEFINITION
+************************************************************************
+**
+** Material properties for the real material
+**
+*uel property,elset=elall
+*******************************************************************
+**Gshr	lamL	Kblk	permit		Gneq	tau	Gneq	tau
+<Gshr>,	<lamL>,	<Kblk>,	<permit>,	<G1>,	<tau1>,	<G2>,	<tau2>,
+**
+**Gneq	tau	nVisco		nlSdv		nInt
+<G3>,	<tau3>,	<nVisco>,	<nlSdv>,	<nInt>
+**
+*******************************************************************
+**
+** Dummy mesh material properties
+**
+*Solid section, elset=ElDummy, material=Material-1
+*Solid section, elset=tempElement, material=Material-2
+***Hourglass stiffness
+**<Ghour>
+**
+*Material, name=Material-1
+*Elastic
+1.e-20
+*Density
+1.0
+*User output variables
+1
+**
+*Material, name=Material-2
+*Elastic
+1.e-20
+*Conductivity
+1.0
+*Density
+1.0
+*Specific heat
+1.0
+**
+************************************************************************
+**			BOUNDARY CONDITIONS
+************************************************************************
+*Contact Pair, Interaction=int, Type=node to surface
+TopSurf,RigidSurf
+**
+*Surface Interaction, name=int
+*Friction
+0.0
+*Surface Behavior, pressure-overclosure=hard
+**
+************************************************************************
+**			INITIAL CONDITIONS
+************************************************************************
+*Initial conditions, type=temperature
+nall, <phi0>
+tempElement, <phi0>
+************************************************************************
+**			   AMPLITUDE
+************************************************************************
+*Amplitude, name=LoadAmp
+0.0,0.0,<tf>,1.0
+*Amplitude, name=UnloadAmp
+0.0,1.0,<tf>,0.0
+*Amplitude, name=HoldAmp
+0.0,1.0,<tf>,1.0
+************************************************************************
+**			STEP DEFINITION
+************************************************************************
+*Step, Name=Step1, nlgeom=yes, inc=50000
+*Coupled temperature-displacement, deltmx=100.0
+<tint>,<tf>,1.e-12,<tint>
+*CONTROLS, PARAMETERS=LINE SEARCH
+10,1.0,0.0001,0.25,0.10
+*CONTROLS, PARAMETERS=TIME INCREMENTATION
+,,,,,,,20,,,,,,
+**
+*Boundary
+RigidRef,encastre
+Bottom,1,2
+Left,1,1
+Right,1,1
+Bottom,11,11,<phi0>
+*Boundary, amplitude=LoadAmp
+Top,11,11,<phi>
+**
+*Boundary
+tempElement,encastre
+tempElement,11,11,<phi0>
+**
+*Output, field, time interval=<tint>
+*node output, nset=nall
+u,nt
+*node output, nset=rigidRef
+u
+*node output, nset=tempElement
+u
+*Element output, elset=ElDummy
+le,uvarm
+**
+*Output, history, frequency=1
+*node output, nset=n3
+u2,nt11
+*node output, nset=n4
+u2
+**
+*End Step
+************************************************************************
+*Step, Name=Step2, nlgeom=yes, inc=50000
+*Coupled temperature-displacement, deltmx=100.0
+<tint>,<tf>,1.e-12,<tint>
+*CONTROLS, PARAMETERS=LINE SEARCH
+10,1.0,0.0001,0.25,0.10
+*CONTROLS, PARAMETERS=TIME INCREMENTATION
+,,,,,,,20,,,,,,
+**
+*Boundary
+RigidRef,encastre
+Bottom,1,2
+Left,1,1
+Right,1,1
+Bottom,11,11,<phi0>
+*Boundary, amplitude=<Step2>
+Top,11,11,<phi>
+**
+*Boundary
+tempElement,encastre
+tempElement,11,11,<phi0>
+**
+*Output, field, time interval=<tint>
+*node output, nset=nall
+u,nt
+*node output, nset=rigidRef
+u
+*node output, nset=tempElement
+u
+*Element output, elset=ElDummy
+le,uvarm
+**
+*Output, history, frequency=1
+*node output, nset=n3
+u2,nt11
+*node output, nset=n4
+u2
+**
+*End Step
+************************************************************************
